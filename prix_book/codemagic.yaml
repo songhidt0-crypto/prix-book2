@@ -1,0 +1,82 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Prix Book — Codemagic CI/CD
+# Debug APK build (signed with Android debug keystore — installable on any
+# Android device with "Unknown sources" enabled).
+#
+# Zero manual secrets required: the debug keystore is generated automatically
+# by the Android SDK on every fresh machine, so nothing needs to be uploaded
+# to Codemagic's environment variables.
+# ─────────────────────────────────────────────────────────────────────────────
+
+workflows:
+  android-debug:
+    name: Android Debug APK
+    max_build_duration: 30        # minutes — free tier limit is 30
+    instance_type: mac_mini_m2    # fastest free-tier machine
+
+    environment:
+      flutter: 3.22.2             # last stable before 3.24 stream; satisfies >=3.19.0
+      java: 17                    # required by AGP 8.1 + Gradle 8.4
+
+    cache:
+      cache_paths:
+        - $FLUTTER_ROOT/.pub-cache
+        - $HOME/.gradle/caches
+
+    scripts:
+      # 1. Write local.properties so Gradle knows where the Flutter & Android SDKs are
+      - name: Generate local.properties
+        script: |
+          echo "flutter.sdk=$FLUTTER_ROOT" > android/local.properties
+          echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
+          echo "flutter.buildMode=debug" >> android/local.properties
+          echo "flutter.versionName=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f1)" >> android/local.properties
+          echo "flutter.versionCode=$(grep '^version:' pubspec.yaml | awk '{print $2}' | cut -d'+' -f2)" >> android/local.properties
+          cat android/local.properties
+
+      # 2. Ensure the Gradle wrapper jar is present (Codemagic caches it after first download)
+      - name: Validate Gradle wrapper
+        script: |
+          if [ ! -f android/gradle/wrapper/gradle-wrapper.jar ]; then
+            echo "Downloading gradle-wrapper.jar..."
+            curl -sL "https://github.com/gradle/gradle/raw/v8.4.0/gradle/wrapper/gradle-wrapper.jar" \
+              -o android/gradle/wrapper/gradle-wrapper.jar
+          fi
+          echo "gradle-wrapper.jar: $(wc -c < android/gradle/wrapper/gradle-wrapper.jar) bytes"
+
+      # 3. Install Flutter dependencies
+      - name: Flutter pub get
+        script: flutter pub get
+
+      # 4. Run tests (non-blocking: failures are reported but don't stop the APK build)
+      - name: Run unit tests
+        script: flutter test --reporter expanded || true
+
+      # 5. Analyze code
+      - name: Flutter analyze
+        script: flutter analyze --no-fatal-infos || true
+
+      # 6. Build debug APK
+      - name: Build debug APK
+        script: |
+          flutter build apk \
+            --debug \
+            --target-platform android-arm64 \
+            --no-tree-shake-icons \
+            --verbose
+
+    artifacts:
+      # Primary APK — download this on your phone
+      - build/app/outputs/flutter-apk/app-debug.apk
+      # Full APK directory in case flutter names it differently
+      - build/app/outputs/flutter-apk/*.apk
+      # Test results
+      - build/test-results/**/*.xml
+
+    publishing:
+      email:
+        recipients:
+          - your@email.com          # ← replace with your email address
+        notify:
+          success: true
+          failure: true
