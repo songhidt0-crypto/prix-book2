@@ -19,12 +19,12 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.dzigner31.prix_book"
-        minSdkVersion 26
-        targetSdkVersion 34
-        versionCode flutter.versionCode
-        versionName flutter.versionName
-    }
+    applicationId "com.dzigner31.prix_book"
+    minSdk 26
+    targetSdk 34
+    versionCode 1
+    versionName "1.0"
+}
 
     buildTypes {
         debug {
