@@ -35,9 +35,11 @@ android {
         release {
             // Uses the debug keystore so no external keystore is needed.
             // Replace with a real signingConfig for production Play Store uploads.
-            signingConfig signingConfigs.debug
-            minifyEnabled true
-            shrinkResources true
+
+signingConfig signingConfigs.debug
+    minifyEnabled false
+    shrinkResources false
+            }
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
